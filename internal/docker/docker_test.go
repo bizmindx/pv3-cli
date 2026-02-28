@@ -5,12 +5,23 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/pv3dev/pv3/internal/project"
 )
+
+// testdataDir returns the absolute path to the top-level testdata/ directory.
+func testdataDir(t *testing.T) string {
+	t.Helper()
+	_, file, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("unable to determine test file path")
+	}
+	return filepath.Join(filepath.Dir(file), "..", "..", "testdata")
+}
 
 func TestSanitizeName(t *testing.T) {
 	tests := []struct {
@@ -156,25 +167,22 @@ func TestBuildDockerArgs_UserMatchesHost(t *testing.T) {
 }
 
 func TestBuildDockerArgs_EnvFile(t *testing.T) {
-	dir := t.TempDir()
 	cfg := RunConfig{Port: 5173, Image: "node:22-bookworm-slim"}
 	proj := &project.ProjectInfo{RunCmd: "npm run dev"}
 
-	// Without .env — flag should be absent
-	args := buildDockerArgs(cfg, dir, "test", proj)
+	// Without .env — flag should be absent (use vite-react which has no .env)
+	noEnvDir := filepath.Join(testdataDir(t), "vite-react")
+	args := buildDockerArgs(cfg, noEnvDir, "test", proj)
 	for _, a := range args {
 		if a == "--env-file" {
 			t.Error("--env-file should not be present when .env doesn't exist")
 		}
 	}
 
-	// With .env — flag should point to the file
-	envPath := filepath.Join(dir, ".env")
-	if err := os.WriteFile(envPath, []byte("FOO=bar\n"), 0644); err != nil {
-		t.Fatal(err)
-	}
-	args = buildDockerArgs(cfg, dir, "test", proj)
-	assertFlagValue(t, args, "--env-file", envPath)
+	// With .env — flag should point to the file (use env-file fixture)
+	envDir := filepath.Join(testdataDir(t), "env-file")
+	args = buildDockerArgs(cfg, envDir, "test", proj)
+	assertFlagValue(t, args, "--env-file", filepath.Join(envDir, ".env"))
 }
 
 func TestBuildDockerArgs_TermPassthrough(t *testing.T) {

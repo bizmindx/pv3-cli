@@ -3,8 +3,19 @@ package project
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 )
+
+// testdataDir returns the absolute path to the top-level testdata/ directory.
+func testdataDir(t *testing.T) string {
+	t.Helper()
+	_, file, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("unable to determine test file path")
+	}
+	return filepath.Join(filepath.Dir(file), "..", "..", "testdata")
+}
 
 func TestResolveScript(t *testing.T) {
 	tests := []struct {
@@ -123,70 +134,75 @@ func TestDetectPackageManager(t *testing.T) {
 	}
 }
 
+// TestReadProject uses testdata fixtures that represent realistic mini-projects.
 func TestReadProject(t *testing.T) {
+	td := testdataDir(t)
+
 	tests := []struct {
-		name        string
-		packageJSON string
-		lockfiles   []string
-		wantScript  string
-		wantPM      string
-		wantRunCmd  string
-		wantErr     bool
+		name       string
+		fixture    string // subdirectory under testdata/
+		wantScript string
+		wantPM     string
+		wantRunCmd string
+		wantErr    bool
 	}{
 		{
-			name:        "vite project with npm",
-			packageJSON: `{"scripts":{"dev":"vite","build":"tsc && vite build"}}`,
-			wantScript:  "dev",
-			wantPM:      "npm",
-			wantRunCmd:  "npm run dev",
+			name:       "vite-react with npm",
+			fixture:    "vite-react",
+			wantScript: "dev",
+			wantPM:     "npm",
+			wantRunCmd: "npm run dev",
 		},
 		{
-			name:        "next.js project with yarn",
-			packageJSON: `{"scripts":{"dev":"next dev","build":"next build","start":"next start"}}`,
-			lockfiles:   []string{"yarn.lock"},
-			wantScript:  "dev",
-			wantPM:      "yarn",
-			wantRunCmd:  "yarn run dev",
+			name:       "next.js with yarn",
+			fixture:    "nextjs-yarn",
+			wantScript: "dev",
+			wantPM:     "yarn",
+			wantRunCmd: "yarn run dev",
 		},
 		{
-			name:        "nuxt project with pnpm",
-			packageJSON: `{"scripts":{"dev":"nuxt dev"}}`,
-			lockfiles:   []string{"pnpm-lock.yaml"},
-			wantScript:  "dev",
-			wantPM:      "pnpm",
-			wantRunCmd:  "pnpm run dev",
+			name:       "nuxt with pnpm",
+			fixture:    "nuxt-pnpm",
+			wantScript: "dev",
+			wantPM:     "pnpm",
+			wantRunCmd: "pnpm run dev",
 		},
 		{
-			name:        "only start script",
-			packageJSON: `{"scripts":{"start":"node server.js"}}`,
-			wantScript:  "start",
-			wantPM:      "npm",
-			wantRunCmd:  "npm run start",
+			name:       "express with start only",
+			fixture:    "express-start",
+			wantScript: "start",
+			wantPM:     "npm",
+			wantRunCmd: "npm run start",
 		},
 		{
-			name:        "no scripts at all",
-			packageJSON: `{"name":"empty-project"}`,
-			wantErr:     true,
+			name:       "vue-cli with serve only",
+			fixture:    "vue-serve",
+			wantScript: "serve",
+			wantPM:     "npm",
+			wantRunCmd: "npm run serve",
 		},
 		{
-			name:        "invalid json",
-			packageJSON: `{broken json`,
-			wantErr:     true,
+			name:    "no dev script",
+			fixture: "no-dev-script",
+			wantErr: true,
+		},
+		{
+			name:    "invalid json",
+			fixture: "invalid-json",
+			wantErr: true,
+		},
+		{
+			name:       "project with .env file",
+			fixture:    "env-file",
+			wantScript: "dev",
+			wantPM:     "npm",
+			wantRunCmd: "npm run dev",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			dir := t.TempDir()
-
-			if err := os.WriteFile(filepath.Join(dir, "package.json"), []byte(tt.packageJSON), 0644); err != nil {
-				t.Fatal(err)
-			}
-			for _, f := range tt.lockfiles {
-				if err := os.WriteFile(filepath.Join(dir, f), []byte{}, 0644); err != nil {
-					t.Fatal(err)
-				}
-			}
+			dir := filepath.Join(td, tt.fixture)
 
 			info, err := ReadProject(dir)
 			if tt.wantErr {
@@ -220,5 +236,21 @@ func TestReadProject_NoPackageJSON(t *testing.T) {
 	want := "no package.json found in current directory"
 	if got := err.Error(); got != want {
 		t.Errorf("error = %q, want %q", got, want)
+	}
+}
+
+// TestReadProject_NonJSProjects verifies that non-JS projects without
+// package.json are rejected cleanly (future runtime support).
+func TestReadProject_NonJSProjects(t *testing.T) {
+	td := testdataDir(t)
+
+	for _, fixture := range []string{"python-flask", "python-django", "go-project"} {
+		t.Run(fixture, func(t *testing.T) {
+			dir := filepath.Join(td, fixture)
+			_, err := ReadProject(dir)
+			if err == nil {
+				t.Error("expected error for non-JS project, got nil")
+			}
+		})
 	}
 }

@@ -1,0 +1,10 @@
+{
+  "name": "app-with-env",
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "vite"
+  },
+  "dependencies": {
+    "vite": "^6.1.0"
+  }
+}

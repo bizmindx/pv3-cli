@@ -1,14 +1,15 @@
-package local
+package dev
 
 import (
 	"fmt"
 	"os"
 
+	"github.com/pv3dev/pv3/internal/docker"
 	"github.com/spf13/cobra"
 )
 
 func NewDevCmd() *cobra.Command {
-	var cfg RunConfig
+	var cfg docker.RunConfig
 
 	cmd := &cobra.Command{
 		Use:   "dev",
@@ -26,7 +27,7 @@ The only difference: rogue dependencies can't touch your host system.`,
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return Run(cfg)
+			return docker.Run(cfg)
 		},
 	}
 

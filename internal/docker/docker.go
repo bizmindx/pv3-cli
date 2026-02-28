@@ -1,4 +1,4 @@
-package local
+package docker
 
 import (
 	"context"
@@ -13,9 +13,10 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/pv3dev/pv3/internal/project"
 )
 
-// ANSI escape codes — only used for pv3's own output, never for app output.
 var (
 	bold  = "\033[1m"
 	dim   = "\033[2m"
@@ -23,11 +24,9 @@ var (
 	green = "\033[32m"
 )
 
-// dockerBin holds the resolved path to docker or podman.
 var dockerBin string
 
 func init() {
-	// Disable colors if not a terminal or NO_COLOR is set
 	if os.Getenv("NO_COLOR") != "" || os.Getenv("TERM") == "dumb" {
 		bold, dim, reset, green = "", "", "", ""
 	}
@@ -46,7 +45,6 @@ func Run(cfg RunConfig) error {
 		return err
 	}
 
-	// Kill any orphaned pv3-dev containers from previous crashed sessions
 	cleanupOrphans()
 
 	if err := checkPort(cfg.Port); err != nil {
@@ -58,20 +56,20 @@ func Run(cfg RunConfig) error {
 		return fmt.Errorf("getting working directory: %w", err)
 	}
 
-	project, err := ReadProject(cwd)
+	proj, err := project.ReadProject(cwd)
 	if err != nil {
 		return err
 	}
 
 	containerName := buildContainerName(cwd)
-	args := buildDockerArgs(cfg, cwd, containerName, project)
+	args := buildDockerArgs(cfg, cwd, containerName, proj)
 
 	if cfg.Verbose {
 		fmt.Fprintf(os.Stderr, "\n%s%s\n\n", dim, formatDockerCmd(dockerBin, args))
 		fmt.Fprint(os.Stderr, reset)
 	}
 
-	fmt.Fprintf(os.Stderr, "\n%spv3%s %s%s run %s%s\n", bold, reset, dim, project.PkgManager, project.ScriptName, reset)
+	fmt.Fprintf(os.Stderr, "\n%spv3%s %s%s run %s%s\n", bold, reset, dim, proj.PkgManager, proj.ScriptName, reset)
 	fmt.Fprintf(os.Stderr, "%s    http://localhost:%d%s\n\n", dim, cfg.Port, reset)
 
 	return execute(containerName, args)
@@ -79,7 +77,6 @@ func Run(cfg RunConfig) error {
 
 // resolveRuntime finds docker or podman and verifies the daemon is running.
 func resolveRuntime() error {
-	// Try docker first, then podman
 	for _, name := range []string{"docker", "podman"} {
 		path, err := exec.LookPath(name)
 		if err != nil {
@@ -90,7 +87,6 @@ func resolveRuntime() error {
 		cmd.Stdout = nil
 		cmd.Stderr = nil
 		if err := cmd.Run(); err != nil {
-			// Found the binary but daemon isn't running
 			if name == "podman" {
 				return fmt.Errorf("Podman is installed but not running. Try: podman machine start")
 			}
@@ -145,7 +141,7 @@ func randomID(n int) string {
 	return string(b)
 }
 
-func buildDockerArgs(cfg RunConfig, cwd, containerName string, project *ProjectInfo) []string {
+func buildDockerArgs(cfg RunConfig, cwd, containerName string, proj *project.ProjectInfo) []string {
 	args := []string{
 		"run",
 		"--rm",
@@ -162,14 +158,12 @@ func buildDockerArgs(cfg RunConfig, cwd, containerName string, project *ProjectI
 		"-e", "NODE_ENV=development",
 	}
 
-	// Pass through TERM for colored output
 	if term := os.Getenv("TERM"); term != "" {
 		args = append(args, "-e", fmt.Sprintf("TERM=%s", term))
 	}
 
-	// Load .env file if it exists
 	envFile := filepath.Join(cwd, ".env")
-	if fileExists(envFile) {
+	if _, err := os.Stat(envFile); err == nil {
 		args = append(args, "--env-file", envFile)
 	}
 
@@ -178,7 +172,7 @@ func buildDockerArgs(cfg RunConfig, cwd, containerName string, project *ProjectI
 	}
 
 	args = append(args, cfg.Image)
-	args = append(args, "sh", "-c", project.RunCmd)
+	args = append(args, "sh", "-c", proj.RunCmd)
 
 	return args
 }
@@ -193,14 +187,11 @@ func execute(containerName string, args []string) error {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
-	// Start the container
 	startTime := time.Now()
 	if err := cmd.Start(); err != nil {
 		return fmt.Errorf("starting container: %w", err)
 	}
 
-	// Signal handling: forward SIGINT/SIGTERM/SIGHUP to docker stop
-	// SIGHUP catches terminal window close / SSH disconnect
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP)
 
@@ -251,7 +242,15 @@ func formatDockerCmd(bin string, args []string) string {
 	i := 0
 	for i < len(args) {
 		arg := args[i]
-		// Flags that take the next element as their value
+
+		// Once we hit a non-flag arg that's not "run", we've reached
+		// the image + command portion. Print the rest as a single line.
+		if !strings.HasPrefix(arg, "-") && arg != "run" {
+			lines = append(lines, fmt.Sprintf("  %s", strings.Join(args[i:], " ")))
+			break
+		}
+
+		// Flags with separate values (e.g. --name pv3-dev-app)
 		if (strings.HasPrefix(arg, "--") || strings.HasPrefix(arg, "-")) &&
 			!strings.Contains(arg, "=") &&
 			i+1 < len(args) &&
@@ -281,7 +280,6 @@ func formatDuration(d time.Duration) string {
 }
 
 // cleanupOrphans finds and kills any leftover pv3-dev containers from crashed sessions.
-// This handles the cases we can't trap: kill -9, panics, power loss.
 func cleanupOrphans() {
 	out, err := exec.Command(dockerBin, "ps", "-q", "--filter", "name=pv3-dev-").Output()
 	if err != nil || len(out) == 0 {

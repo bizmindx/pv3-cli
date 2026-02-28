@@ -1,4 +1,4 @@
-package local
+package project
 
 import (
 	"encoding/json"
@@ -51,7 +51,6 @@ func ReadProject(dir string) (*ProjectInfo, error) {
 	}, nil
 }
 
-// resolveScript picks the first available script in priority order.
 func resolveScript(scripts map[string]string) (string, string, error) {
 	for _, name := range []string{"dev", "start", "serve"} {
 		if cmd, ok := scripts[name]; ok && cmd != "" {
@@ -61,7 +60,6 @@ func resolveScript(scripts map[string]string) (string, string, error) {
 	return "", "", fmt.Errorf("no dev, start, or serve script found in package.json")
 }
 
-// detectPackageManager checks for lockfiles to determine the package manager.
 func detectPackageManager(dir string) string {
 	if fileExists(filepath.Join(dir, "pnpm-lock.yaml")) {
 		return "pnpm"

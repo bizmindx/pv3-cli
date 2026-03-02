@@ -1,6 +1,7 @@
 # Binary
 /pv3
 /dist/
+.claude/
 
 # IDE
 .idea/

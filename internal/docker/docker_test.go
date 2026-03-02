@@ -171,7 +171,7 @@ func TestBuildDockerArgs_EnvFile(t *testing.T) {
 	proj := &project.ProjectInfo{RunCmd: "npm run dev"}
 
 	// Without .env — flag should be absent (use vite-react which has no .env)
-	noEnvDir := filepath.Join(testdataDir(t), "vite-react")
+	noEnvDir := filepath.Join(testdataDir(t), "javascript", "vite-react")
 	args := buildDockerArgs(cfg, noEnvDir, "test", proj)
 	for _, a := range args {
 		if a == "--env-file" {
@@ -180,7 +180,7 @@ func TestBuildDockerArgs_EnvFile(t *testing.T) {
 	}
 
 	// With .env — flag should point to the file (use env-file fixture)
-	envDir := filepath.Join(testdataDir(t), "env-file")
+	envDir := filepath.Join(testdataDir(t), "javascript", "env-file")
 	args = buildDockerArgs(cfg, envDir, "test", proj)
 	assertFlagValue(t, args, "--env-file", filepath.Join(envDir, ".env"))
 }

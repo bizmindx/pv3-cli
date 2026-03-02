@@ -140,7 +140,7 @@ func TestReadProject(t *testing.T) {
 
 	tests := []struct {
 		name       string
-		fixture    string // subdirectory under testdata/
+		fixture    string // path relative to testdata/
 		wantScript string
 		wantPM     string
 		wantRunCmd string
@@ -148,52 +148,52 @@ func TestReadProject(t *testing.T) {
 	}{
 		{
 			name:       "vite-react with npm",
-			fixture:    "vite-react",
+			fixture:    "javascript/vite-react",
 			wantScript: "dev",
 			wantPM:     "npm",
 			wantRunCmd: "npm run dev",
 		},
 		{
 			name:       "next.js with yarn",
-			fixture:    "nextjs-yarn",
+			fixture:    "javascript/nextjs-yarn",
 			wantScript: "dev",
 			wantPM:     "yarn",
 			wantRunCmd: "yarn run dev",
 		},
 		{
 			name:       "nuxt with pnpm",
-			fixture:    "nuxt-pnpm",
+			fixture:    "javascript/nuxt-pnpm",
 			wantScript: "dev",
 			wantPM:     "pnpm",
 			wantRunCmd: "pnpm run dev",
 		},
 		{
 			name:       "express with start only",
-			fixture:    "express-start",
+			fixture:    "javascript/express-start",
 			wantScript: "start",
 			wantPM:     "npm",
 			wantRunCmd: "npm run start",
 		},
 		{
 			name:       "vue-cli with serve only",
-			fixture:    "vue-serve",
+			fixture:    "javascript/vue-serve",
 			wantScript: "serve",
 			wantPM:     "npm",
 			wantRunCmd: "npm run serve",
 		},
 		{
 			name:    "no dev script",
-			fixture: "no-dev-script",
+			fixture: "javascript/no-dev-script",
 			wantErr: true,
 		},
 		{
 			name:    "invalid json",
-			fixture: "invalid-json",
+			fixture: "javascript/invalid-json",
 			wantErr: true,
 		},
 		{
 			name:       "project with .env file",
-			fixture:    "env-file",
+			fixture:    "javascript/env-file",
 			wantScript: "dev",
 			wantPM:     "npm",
 			wantRunCmd: "npm run dev",
@@ -244,7 +244,7 @@ func TestReadProject_NoPackageJSON(t *testing.T) {
 func TestReadProject_NonJSProjects(t *testing.T) {
 	td := testdataDir(t)
 
-	for _, fixture := range []string{"python-flask", "python-django", "go-project"} {
+	for _, fixture := range []string{"python/python-flask", "python/python-django", "go/go-project"} {
 		t.Run(fixture, func(t *testing.T) {
 			dir := filepath.Join(td, fixture)
 			_, err := ReadProject(dir)

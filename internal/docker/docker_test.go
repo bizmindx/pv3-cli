@@ -229,6 +229,26 @@ func TestBuildDockerArgs_PortMapping(t *testing.T) {
 	}
 }
 
+func TestBuildDockerArgs_ImageAutoDetect(t *testing.T) {
+	// When cfg.Image is empty, buildDockerArgs should use proj.Image
+	cfg := RunConfig{Port: 5173, Image: ""}
+	proj := &project.ProjectInfo{RunCmd: "flask run", Image: "python:3.12-slim"}
+
+	args := buildDockerArgs(cfg, "/tmp/test", "test", proj)
+	assertContains(t, args, "python:3.12-slim")
+	assertNotContains(t, args, "node:22-bookworm-slim")
+}
+
+func TestBuildDockerArgs_ImageOverride(t *testing.T) {
+	// When cfg.Image is set, it should override proj.Image
+	cfg := RunConfig{Port: 5173, Image: "python:3.11-slim"}
+	proj := &project.ProjectInfo{RunCmd: "flask run", Image: "python:3.12-slim"}
+
+	args := buildDockerArgs(cfg, "/tmp/test", "test", proj)
+	assertContains(t, args, "python:3.11-slim")
+	assertNotContains(t, args, "python:3.12-slim")
+}
+
 func TestCheckPort_Free(t *testing.T) {
 	// Bind to port 0 to get an OS-assigned free port, then close it,
 	// then verify checkPort succeeds on that same port.

@@ -126,9 +126,9 @@ func TestDetectPackageManager(t *testing.T) {
 				}
 			}
 
-			got := detectPackageManager(dir)
+			got := detectNodePkgManager(dir)
 			if got != tt.wantPM {
-				t.Errorf("detectPackageManager() = %q, want %q", got, tt.wantPM)
+				t.Errorf("detectNodePkgManager() = %q, want %q", got, tt.wantPM)
 			}
 		})
 	}
@@ -139,47 +139,59 @@ func TestReadProject(t *testing.T) {
 	td := testdataDir(t)
 
 	tests := []struct {
-		name       string
-		fixture    string // path relative to testdata/
-		wantScript string
-		wantPM     string
-		wantRunCmd string
-		wantErr    bool
+		name        string
+		fixture     string // path relative to testdata/
+		wantRuntime string
+		wantScript  string
+		wantPM      string
+		wantRunCmd  string
+		wantImage   string
+		wantErr     bool
 	}{
 		{
-			name:       "vite-react with npm",
-			fixture:    "javascript/vite-react",
-			wantScript: "dev",
-			wantPM:     "npm",
-			wantRunCmd: "npm run dev",
+			name:        "vite-react with npm",
+			fixture:     "javascript/vite-react",
+			wantRuntime: "node",
+			wantScript:  "dev",
+			wantPM:      "npm",
+			wantRunCmd:  "npm run dev",
+			wantImage:   "node:22-bookworm-slim",
 		},
 		{
-			name:       "next.js with yarn",
-			fixture:    "javascript/nextjs-yarn",
-			wantScript: "dev",
-			wantPM:     "yarn",
-			wantRunCmd: "yarn run dev",
+			name:        "next.js with yarn",
+			fixture:     "javascript/nextjs-yarn",
+			wantRuntime: "node",
+			wantScript:  "dev",
+			wantPM:      "yarn",
+			wantRunCmd:  "yarn run dev",
+			wantImage:   "node:22-bookworm-slim",
 		},
 		{
-			name:       "nuxt with pnpm",
-			fixture:    "javascript/nuxt-pnpm",
-			wantScript: "dev",
-			wantPM:     "pnpm",
-			wantRunCmd: "pnpm run dev",
+			name:        "nuxt with pnpm",
+			fixture:     "javascript/nuxt-pnpm",
+			wantRuntime: "node",
+			wantScript:  "dev",
+			wantPM:      "pnpm",
+			wantRunCmd:  "pnpm run dev",
+			wantImage:   "node:22-bookworm-slim",
 		},
 		{
-			name:       "express with start only",
-			fixture:    "javascript/express-start",
-			wantScript: "start",
-			wantPM:     "npm",
-			wantRunCmd: "npm run start",
+			name:        "express with start only",
+			fixture:     "javascript/express-start",
+			wantRuntime: "node",
+			wantScript:  "start",
+			wantPM:      "npm",
+			wantRunCmd:  "npm run start",
+			wantImage:   "node:22-bookworm-slim",
 		},
 		{
-			name:       "vue-cli with serve only",
-			fixture:    "javascript/vue-serve",
-			wantScript: "serve",
-			wantPM:     "npm",
-			wantRunCmd: "npm run serve",
+			name:        "vue-cli with serve only",
+			fixture:     "javascript/vue-serve",
+			wantRuntime: "node",
+			wantScript:  "serve",
+			wantPM:      "npm",
+			wantRunCmd:  "npm run serve",
+			wantImage:   "node:22-bookworm-slim",
 		},
 		{
 			name:    "no dev script",
@@ -192,11 +204,31 @@ func TestReadProject(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name:       "project with .env file",
-			fixture:    "javascript/env-file",
-			wantScript: "dev",
-			wantPM:     "npm",
-			wantRunCmd: "npm run dev",
+			name:        "project with .env file",
+			fixture:     "javascript/env-file",
+			wantRuntime: "node",
+			wantScript:  "dev",
+			wantPM:      "npm",
+			wantRunCmd:  "npm run dev",
+			wantImage:   "node:22-bookworm-slim",
+		},
+		{
+			name:        "django via ReadProject dispatcher",
+			fixture:     "python/python-django",
+			wantRuntime: "python",
+			wantScript:  "runserver",
+			wantPM:      "pip",
+			wantRunCmd:  "python manage.py runserver 0.0.0.0:8000",
+			wantImage:   "python:3.12-slim",
+		},
+		{
+			name:        "flask via ReadProject dispatcher",
+			fixture:     "python/python-flask",
+			wantRuntime: "python",
+			wantScript:  "flask run",
+			wantPM:      "pip",
+			wantRunCmd:  "flask run --host=0.0.0.0 --port=5000",
+			wantImage:   "python:3.12-slim",
 		},
 	}
 
@@ -214,6 +246,9 @@ func TestReadProject(t *testing.T) {
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
+			if info.Runtime != tt.wantRuntime {
+				t.Errorf("Runtime = %q, want %q", info.Runtime, tt.wantRuntime)
+			}
 			if info.ScriptName != tt.wantScript {
 				t.Errorf("ScriptName = %q, want %q", info.ScriptName, tt.wantScript)
 			}
@@ -223,34 +258,33 @@ func TestReadProject(t *testing.T) {
 			if info.RunCmd != tt.wantRunCmd {
 				t.Errorf("RunCmd = %q, want %q", info.RunCmd, tt.wantRunCmd)
 			}
+			if info.Image != tt.wantImage {
+				t.Errorf("Image = %q, want %q", info.Image, tt.wantImage)
+			}
 		})
 	}
 }
 
-func TestReadProject_NoPackageJSON(t *testing.T) {
+func TestReadProject_EmptyDir(t *testing.T) {
 	dir := t.TempDir()
 	_, err := ReadProject(dir)
 	if err == nil {
-		t.Fatal("expected error for missing package.json")
+		t.Fatal("expected error for empty directory")
 	}
-	want := "no package.json found in current directory"
+	want := "could not detect project type in current directory"
 	if got := err.Error(); got != want {
 		t.Errorf("error = %q, want %q", got, want)
 	}
 }
 
-// TestReadProject_NonJSProjects verifies that non-JS projects without
-// package.json are rejected cleanly (future runtime support).
-func TestReadProject_NonJSProjects(t *testing.T) {
+// TestReadProject_UnsupportedRuntime verifies that projects without
+// Node.js or Python markers are rejected cleanly.
+func TestReadProject_UnsupportedRuntime(t *testing.T) {
 	td := testdataDir(t)
 
-	for _, fixture := range []string{"python/python-flask", "python/python-django", "go/go-project"} {
-		t.Run(fixture, func(t *testing.T) {
-			dir := filepath.Join(td, fixture)
-			_, err := ReadProject(dir)
-			if err == nil {
-				t.Error("expected error for non-JS project, got nil")
-			}
-		})
+	dir := filepath.Join(td, "go", "go-project")
+	_, err := ReadProject(dir)
+	if err == nil {
+		t.Error("expected error for Go project (unsupported runtime), got nil")
 	}
 }

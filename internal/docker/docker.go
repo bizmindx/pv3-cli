@@ -171,7 +171,11 @@ func buildDockerArgs(cfg RunConfig, cwd, containerName string, proj *project.Pro
 		args = append(args, "--network=none")
 	}
 
-	args = append(args, cfg.Image)
+	image := cfg.Image
+	if image == "" {
+		image = proj.Image
+	}
+	args = append(args, image)
 	args = append(args, "sh", "-c", proj.RunCmd)
 
 	return args

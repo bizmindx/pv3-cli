@@ -1,0 +1,16 @@
+[project]
+name = "custom-app"
+version = "1.0.0"
+requires-python = ">=3.11"
+dependencies = [
+    "starlette>=0.40.0",
+    "httpx>=0.27.0",
+]
+
+[project.scripts]
+dev = "app:main"
+build = "scripts:build"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

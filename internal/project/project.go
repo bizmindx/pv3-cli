@@ -8,26 +8,38 @@ import (
 )
 
 type ProjectInfo struct {
-	ScriptName string // "dev", "start", or "serve"
-	ScriptCmd  string // the actual script value from package.json
-	PkgManager string // "npm", "yarn", or "pnpm"
-	RunCmd     string // full command: e.g. "npm run dev"
+	Runtime    string // "node" or "python"
+	ScriptName string // "dev", "start", "runserver", etc.
+	ScriptCmd  string // the actual script value or resolved command
+	PkgManager string // "npm", "yarn", "pnpm", "pip", "uv", "poetry"
+	RunCmd     string // full command to execute in container
+	Image      string // default Docker image for this runtime
 }
 
 type packageJSON struct {
 	Scripts map[string]string `json:"scripts"`
 }
 
-// ReadProject reads package.json and lockfiles from dir to determine
-// what dev command to run and which package manager to use.
+// ReadProject detects the project type and returns the dev command to run.
+// Detection order: Node.js (package.json) → Python → error.
 func ReadProject(dir string) (*ProjectInfo, error) {
+	if fileExists(filepath.Join(dir, "package.json")) {
+		return readNodeProject(dir)
+	}
+
+	if isPythonProject(dir) {
+		return readPythonProject(dir)
+	}
+
+	return nil, fmt.Errorf("could not detect project type in current directory")
+}
+
+// readNodeProject reads package.json and lockfiles from dir.
+func readNodeProject(dir string) (*ProjectInfo, error) {
 	pkgPath := filepath.Join(dir, "package.json")
 
 	data, err := os.ReadFile(pkgPath)
 	if err != nil {
-		if os.IsNotExist(err) {
-			return nil, fmt.Errorf("no package.json found in current directory")
-		}
 		return nil, fmt.Errorf("reading package.json: %w", err)
 	}
 
@@ -41,13 +53,15 @@ func ReadProject(dir string) (*ProjectInfo, error) {
 		return nil, err
 	}
 
-	pm := detectPackageManager(dir)
+	pm := detectNodePkgManager(dir)
 
 	return &ProjectInfo{
+		Runtime:    "node",
 		ScriptName: scriptName,
 		ScriptCmd:  scriptCmd,
 		PkgManager: pm,
 		RunCmd:     fmt.Sprintf("%s run %s", pm, scriptName),
+		Image:      "node:22-bookworm-slim",
 	}, nil
 }
 
@@ -60,7 +74,7 @@ func resolveScript(scripts map[string]string) (string, string, error) {
 	return "", "", fmt.Errorf("no dev, start, or serve script found in package.json")
 }
 
-func detectPackageManager(dir string) string {
+func detectNodePkgManager(dir string) string {
 	if fileExists(filepath.Join(dir, "pnpm-lock.yaml")) {
 		return "pnpm"
 	}

@@ -15,7 +15,7 @@ func TestNewDevCmd_Defaults(t *testing.T) {
 	}{
 		{"port", 5173},
 		{"no-net", false},
-		{"image", "node:22-bookworm-slim"},
+		{"image", ""},
 		{"verbose", false},
 	}
 

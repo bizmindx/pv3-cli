@@ -33,7 +33,7 @@ The only difference: rogue dependencies can't touch your host system.`,
 
 	cmd.Flags().IntVar(&cfg.Port, "port", 5173, "Host port to publish")
 	cmd.Flags().BoolVar(&cfg.NoNet, "no-net", false, "Disable all network access")
-	cmd.Flags().StringVar(&cfg.Image, "image", "node:22-bookworm-slim", "Container image to use")
+	cmd.Flags().StringVar(&cfg.Image, "image", "", "Container image (auto-detected from project type)")
 	cmd.Flags().BoolVar(&cfg.Verbose, "verbose", false, "Print the docker run command")
 
 	return cmd

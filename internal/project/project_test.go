@@ -230,6 +230,24 @@ func TestReadProject(t *testing.T) {
 			wantRunCmd:  "flask run --host=0.0.0.0 --port=5000",
 			wantImage:   "python:3.12-slim",
 		},
+		{
+			name:        "solana anchor via ReadProject dispatcher",
+			fixture:     "rust/solana-anchor",
+			wantRuntime: "rust",
+			wantScript:  "anchor build",
+			wantPM:      "cargo",
+			wantRunCmd:  "cargo run",
+			wantImage:   "rust:1.85-slim",
+		},
+		{
+			name:        "generic rust via ReadProject dispatcher",
+			fixture:     "rust/rust-generic",
+			wantRuntime: "rust",
+			wantScript:  "run",
+			wantPM:      "cargo",
+			wantRunCmd:  "cargo run",
+			wantImage:   "rust:1.85-slim",
+		},
 	}
 
 	for _, tt := range tests {

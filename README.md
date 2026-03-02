@@ -5,7 +5,7 @@ Run your dev server in an isolated Docker container. Same logs, same localhost U
 ## Quick start
 
 ```sh
-curl -fsSL https://get.pv3.dev | sh
+curl -fsSL https://pv3.dev | sh
 ```
 
 Or build from source:
@@ -39,6 +39,8 @@ pv3 dev --verbose              # print the full docker run command
 
 **Python** — detects `pyproject.toml`, `requirements.txt`, `setup.py`, or `Pipfile`. Supports Django, Flask, and FastAPI with auto-configured dev server commands. Picks pip/uv/poetry/pipenv from lockfiles.
 
+**Rust** — detects `Cargo.toml`. Recognizes Solana Anchor projects (`Anchor.toml`, `anchor-lang`) and native Solana programs (`solana-sdk`, `solana-program`). Isolates `cargo build` from your host — build scripts in untrusted crates can't escape the container.
+
 ## How it works
 
 1. Detects your project type and dev command from manifest files
@@ -68,7 +70,7 @@ main.go                     # entry point
 internal/
   dev/                      # CLI commands (cobra)
   docker/                   # container orchestration
-  project/                  # project detection (node, python)
+  project/                  # project detection (node, python, rust)
 testdata/                   # test fixtures by language
 ```
 

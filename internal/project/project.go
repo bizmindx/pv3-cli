@@ -8,7 +8,7 @@ import (
 )
 
 type ProjectInfo struct {
-	Runtime    string // "node" or "python"
+	Runtime    string // "node", "python", or "rust"
 	ScriptName string // "dev", "start", "runserver", etc.
 	ScriptCmd  string // the actual script value or resolved command
 	PkgManager string // "npm", "yarn", "pnpm", "pip", "uv", "poetry"
@@ -21,7 +21,7 @@ type packageJSON struct {
 }
 
 // ReadProject detects the project type and returns the dev command to run.
-// Detection order: Node.js (package.json) → Python → error.
+// Detection order: Node.js (package.json) → Python → Rust → error.
 func ReadProject(dir string) (*ProjectInfo, error) {
 	if fileExists(filepath.Join(dir, "package.json")) {
 		return readNodeProject(dir)
@@ -29,6 +29,10 @@ func ReadProject(dir string) (*ProjectInfo, error) {
 
 	if isPythonProject(dir) {
 		return readPythonProject(dir)
+	}
+
+	if isRustProject(dir) {
+		return readRustProject(dir)
 	}
 
 	return nil, fmt.Errorf("could not detect project type in current directory")

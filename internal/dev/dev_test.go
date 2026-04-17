@@ -197,3 +197,80 @@ func TestNewRootCmd_InstallSubcommand(t *testing.T) {
 		t.Errorf("subcommands = %v, missing 'install'", names)
 	}
 }
+
+func TestNewRunCmd_Defaults(t *testing.T) {
+	cmd := NewRunCmd()
+
+	port, err := cmd.Flags().GetInt("port")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if port != 5173 {
+		t.Errorf("port = %d, want 5173", port)
+	}
+
+	noNet, _ := cmd.Flags().GetBool("no-net")
+	if noNet {
+		t.Error("no-net should default to false")
+	}
+
+	image, _ := cmd.Flags().GetString("image")
+	if image != "" {
+		t.Errorf("image should default to empty, got %q", image)
+	}
+
+	verbose, _ := cmd.Flags().GetBool("verbose")
+	if verbose {
+		t.Error("verbose should default to false")
+	}
+}
+
+func TestNewRunCmd_RequiresArg(t *testing.T) {
+	cmd := NewRunCmd()
+	cmd.SetArgs([]string{})
+	cmd.RunE = func(cmd *cobra.Command, args []string) error { return nil }
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Error("expected error when no repo URL provided")
+	}
+}
+
+func TestNewRunCmd_FlagParsing(t *testing.T) {
+	cmd := NewRunCmd()
+	cmd.SetArgs([]string{"https://github.com/user/repo", "--port", "3000", "--verbose"})
+	cmd.RunE = func(cmd *cobra.Command, args []string) error { return nil }
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatal(err)
+	}
+
+	port, _ := cmd.Flags().GetInt("port")
+	if port != 3000 {
+		t.Errorf("port = %d, want 3000", port)
+	}
+
+	verbose, _ := cmd.Flags().GetBool("verbose")
+	if !verbose {
+		t.Error("verbose should be true after --verbose")
+	}
+}
+
+func TestNewRootCmd_RunSubcommand(t *testing.T) {
+	root := NewRootCmd("test")
+
+	var names []string
+	for _, cmd := range root.Commands() {
+		names = append(names, cmd.Name())
+	}
+
+	found := false
+	for _, n := range names {
+		if n == "run" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("subcommands = %v, missing 'run'", names)
+	}
+}

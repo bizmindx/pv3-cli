@@ -426,6 +426,29 @@ func TestBuildInstallArgs_ImageOverride(t *testing.T) {
 	assertNotContains(t, args, "python:3.12-slim")
 }
 
+func TestExtractRepoName(t *testing.T) {
+	tests := []struct {
+		url  string
+		want string
+	}{
+		{"https://github.com/user/my-app.git", "my-app"},
+		{"https://github.com/user/my-app", "my-app"},
+		{"git@github.com:user/my-app.git", "my-app"},
+		{"https://github.com/user/my-app/", "my-app"},
+		{"https://gitlab.com/org/sub/repo.git", "repo"},
+		{"my-app", "my-app"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.url, func(t *testing.T) {
+			got := extractRepoName(tt.url)
+			if got != tt.want {
+				t.Errorf("extractRepoName(%q) = %q, want %q", tt.url, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestBuildInstallArgs_NoNodeEnv(t *testing.T) {
 	cfg := RunConfig{Image: "node:22-bookworm-slim"}
 	proj := &project.ProjectInfo{InstallCmd: "npm install"}

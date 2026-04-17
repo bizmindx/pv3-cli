@@ -37,6 +37,19 @@ type RunConfig struct {
 	NoNet   bool
 	Image   string
 	Verbose bool
+	Dir     string // project directory (defaults to cwd if empty)
+}
+
+// resolveDir returns cfg.Dir if set, otherwise the current working directory.
+func resolveDir(cfg RunConfig) (string, error) {
+	if cfg.Dir != "" {
+		return cfg.Dir, nil
+	}
+	dir, err := os.Getwd()
+	if err != nil {
+		return "", fmt.Errorf("getting working directory: %w", err)
+	}
+	return dir, nil
 }
 
 // RunInstall installs project dependencies inside a Docker container.
@@ -47,12 +60,12 @@ func RunInstall(cfg RunConfig) error {
 
 	cleanupOrphans()
 
-	cwd, err := os.Getwd()
+	dir, err := resolveDir(cfg)
 	if err != nil {
-		return fmt.Errorf("getting working directory: %w", err)
+		return err
 	}
 
-	proj, err := project.ReadProject(cwd)
+	proj, err := project.ReadProject(dir)
 	if err != nil {
 		return err
 	}
@@ -61,8 +74,8 @@ func RunInstall(cfg RunConfig) error {
 		return fmt.Errorf("no install command detected for %s project", proj.Runtime)
 	}
 
-	containerName := buildContainerName(cwd)
-	args := buildInstallArgs(cfg, cwd, containerName, proj)
+	containerName := buildContainerName(dir)
+	args := buildInstallArgs(cfg, dir, containerName, proj)
 
 	if cfg.Verbose {
 		fmt.Fprintf(os.Stderr, "\n%s%s\n\n", dim, formatDockerCmd(dockerBin, args))
@@ -86,18 +99,18 @@ func Run(cfg RunConfig) error {
 		return err
 	}
 
-	cwd, err := os.Getwd()
-	if err != nil {
-		return fmt.Errorf("getting working directory: %w", err)
-	}
-
-	proj, err := project.ReadProject(cwd)
+	dir, err := resolveDir(cfg)
 	if err != nil {
 		return err
 	}
 
-	containerName := buildContainerName(cwd)
-	args := buildDockerArgs(cfg, cwd, containerName, proj)
+	proj, err := project.ReadProject(dir)
+	if err != nil {
+		return err
+	}
+
+	containerName := buildContainerName(dir)
+	args := buildDockerArgs(cfg, dir, containerName, proj)
 
 	if cfg.Verbose {
 		fmt.Fprintf(os.Stderr, "\n%s%s\n\n", dim, formatDockerCmd(dockerBin, args))
@@ -108,6 +121,65 @@ func Run(cfg RunConfig) error {
 	fmt.Fprintf(os.Stderr, "%s    http://localhost:%d%s\n\n", dim, cfg.Port, reset)
 
 	return execute(containerName, args)
+}
+
+// CloneRepo clones a git repository and returns the path to the cloned directory.
+func CloneRepo(repoURL string) (string, error) {
+	// Check git is available
+	gitBin, err := exec.LookPath("git")
+	if err != nil {
+		return "", fmt.Errorf("git is required but not found")
+	}
+
+	// Extract repo name from URL for the directory name
+	repoName := extractRepoName(repoURL)
+	if repoName == "" {
+		return "", fmt.Errorf("could not determine repository name from URL: %s", repoURL)
+	}
+
+	// Clone into current directory
+	cwd, err := os.Getwd()
+	if err != nil {
+		return "", fmt.Errorf("getting working directory: %w", err)
+	}
+
+	destDir := filepath.Join(cwd, repoName)
+
+	// If directory already exists, don't re-clone
+	if _, err := os.Stat(destDir); err == nil {
+		fmt.Fprintf(os.Stderr, "%s%s already exists, skipping clone%s\n", dim, repoName, reset)
+		return destDir, nil
+	}
+
+	fmt.Fprintf(os.Stderr, "\n%spv3%s %scloning %s%s\n\n", bold, reset, dim, repoURL, reset)
+
+	cmd := exec.Command(gitBin, "clone", "--depth=1", repoURL, destDir)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	if err := cmd.Run(); err != nil {
+		return "", fmt.Errorf("cloning repository: %w", err)
+	}
+
+	return destDir, nil
+}
+
+// extractRepoName gets the repo name from a git URL.
+// Handles: https://github.com/user/repo.git, git@github.com:user/repo.git, user/repo
+func extractRepoName(url string) string {
+	// Strip trailing .git
+	url = strings.TrimSuffix(url, ".git")
+	// Strip trailing slash
+	url = strings.TrimSuffix(url, "/")
+
+	// Get the last path component
+	if i := strings.LastIndex(url, "/"); i >= 0 {
+		return url[i+1:]
+	}
+	if i := strings.LastIndex(url, ":"); i >= 0 {
+		return url[i+1:]
+	}
+	return url
 }
 
 // resolveRuntime finds docker or podman and verifies the daemon is running.

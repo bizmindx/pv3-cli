@@ -13,6 +13,7 @@ type ProjectInfo struct {
 	ScriptCmd  string // the actual script value or resolved command
 	PkgManager string // "npm", "yarn", "pnpm", "pip", "uv", "poetry"
 	RunCmd     string // full command to execute in container
+	InstallCmd string // command to install dependencies in container
 	Image      string // default Docker image for this runtime
 }
 
@@ -65,6 +66,7 @@ func readNodeProject(dir string) (*ProjectInfo, error) {
 		ScriptCmd:  scriptCmd,
 		PkgManager: pm,
 		RunCmd:     fmt.Sprintf("%s run %s", pm, scriptName),
+		InstallCmd: pm + " install",
 		Image:      "node:22-bookworm-slim",
 	}, nil
 }

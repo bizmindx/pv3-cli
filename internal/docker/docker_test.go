@@ -365,6 +365,79 @@ func TestFormatDockerCmd(t *testing.T) {
 	}
 }
 
+func TestBuildInstallArgs_CoreFlags(t *testing.T) {
+	cfg := RunConfig{
+		NoNet: false,
+		Image: "node:22-bookworm-slim",
+	}
+	proj := &project.ProjectInfo{
+		Runtime:    "node",
+		PkgManager: "npm",
+		InstallCmd: "npm install",
+		Image:      "node:22-bookworm-slim",
+	}
+
+	args := buildInstallArgs(cfg, "/home/user/app", "pv3-dev-app-abc123", proj)
+
+	for _, want := range []string{"run", "--rm", "-it", "--cap-drop=ALL", "--cpus=4", "--memory=6g"} {
+		assertContains(t, args, want)
+	}
+
+	assertFlagValue(t, args, "--name", "pv3-dev-app-abc123")
+	assertFlagValue(t, args, "-w", "/workspace")
+	assertFlagValue(t, args, "--security-opt", "no-new-privileges:true")
+
+	// No port mapping for install
+	for _, a := range args {
+		if a == "-p" {
+			t.Error("install args should not contain -p (port mapping)")
+		}
+	}
+
+	// Final args must be: sh -c "npm install"
+	tail := args[len(args)-3:]
+	if tail[0] != "sh" || tail[1] != "-c" || tail[2] != "npm install" {
+		t.Errorf("tail args = %v, want [sh -c npm install]", tail)
+	}
+}
+
+func TestBuildInstallArgs_NoNet(t *testing.T) {
+	cfg := RunConfig{NoNet: true, Image: "node:22-bookworm-slim"}
+	proj := &project.ProjectInfo{InstallCmd: "npm install"}
+
+	args := buildInstallArgs(cfg, "/home/user/app", "test", proj)
+	assertContains(t, args, "--network=none")
+}
+
+func TestBuildInstallArgs_ImageAutoDetect(t *testing.T) {
+	cfg := RunConfig{Image: ""}
+	proj := &project.ProjectInfo{InstallCmd: "pip install -r requirements.txt", Image: "python:3.12-slim"}
+
+	args := buildInstallArgs(cfg, "/tmp/test", "test", proj)
+	assertContains(t, args, "python:3.12-slim")
+}
+
+func TestBuildInstallArgs_ImageOverride(t *testing.T) {
+	cfg := RunConfig{Image: "python:3.11-slim"}
+	proj := &project.ProjectInfo{InstallCmd: "pip install -r requirements.txt", Image: "python:3.12-slim"}
+
+	args := buildInstallArgs(cfg, "/tmp/test", "test", proj)
+	assertContains(t, args, "python:3.11-slim")
+	assertNotContains(t, args, "python:3.12-slim")
+}
+
+func TestBuildInstallArgs_NoNodeEnv(t *testing.T) {
+	cfg := RunConfig{Image: "node:22-bookworm-slim"}
+	proj := &project.ProjectInfo{InstallCmd: "npm install"}
+
+	args := buildInstallArgs(cfg, "/tmp/test", "test", proj)
+	for i, a := range args {
+		if a == "-e" && i+1 < len(args) && args[i+1] == "NODE_ENV=development" {
+			t.Error("install args should not set NODE_ENV=development")
+		}
+	}
+}
+
 // helpers
 
 func assertContains(t *testing.T, args []string, want string) {

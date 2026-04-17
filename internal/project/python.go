@@ -28,6 +28,8 @@ func readPythonProject(dir string) (*ProjectInfo, error) {
 	if fileExists(filepath.Join(dir, "pyproject.toml")) {
 		sections := parsePyprojectTOML(filepath.Join(dir, "pyproject.toml"))
 
+		installCmd := pythonInstallCmd(pm)
+
 		// Check [project.scripts] for dev/serve/start/run keys
 		if scripts, ok := sections["project.scripts"]; ok {
 			if name, cmd := resolvePyScript(scripts); name != "" {
@@ -37,6 +39,7 @@ func readPythonProject(dir string) (*ProjectInfo, error) {
 					ScriptCmd:  cmd,
 					PkgManager: pm,
 					RunCmd:     cmd,
+					InstallCmd: installCmd,
 					Image:      pythonImage,
 				}, nil
 			}
@@ -51,6 +54,7 @@ func readPythonProject(dir string) (*ProjectInfo, error) {
 					ScriptCmd:  cmd,
 					PkgManager: pm,
 					RunCmd:     cmd,
+					InstallCmd: installCmd,
 					Image:      pythonImage,
 				}, nil
 			}
@@ -64,6 +68,7 @@ func readPythonProject(dir string) (*ProjectInfo, error) {
 	}
 
 	// Fallback: look for common entry point files
+	installCmd := pythonInstallCmd(pm)
 	for _, entry := range []string{"app.py", "main.py"} {
 		if fileExists(filepath.Join(dir, entry)) {
 			return &ProjectInfo{
@@ -72,6 +77,7 @@ func readPythonProject(dir string) (*ProjectInfo, error) {
 				ScriptCmd:  "python " + entry,
 				PkgManager: pm,
 				RunCmd:     "python " + entry,
+				InstallCmd: installCmd,
 				Image:      pythonImage,
 			}, nil
 		}
@@ -237,6 +243,8 @@ func parseRequirementsTxt(path string) []string {
 
 // detectPythonFramework checks for known frameworks in the dependency set.
 func detectPythonFramework(dir string, deps map[string]bool, pm string) *ProjectInfo {
+	installCmd := pythonInstallCmd(pm)
+
 	// Django: needs manage.py
 	if deps["django"] && fileExists(filepath.Join(dir, "manage.py")) {
 		return &ProjectInfo{
@@ -245,6 +253,7 @@ func detectPythonFramework(dir string, deps map[string]bool, pm string) *Project
 			ScriptCmd:  "python manage.py runserver 0.0.0.0:8000",
 			PkgManager: pm,
 			RunCmd:     "python manage.py runserver 0.0.0.0:8000",
+			InstallCmd: installCmd,
 			Image:      pythonImage,
 		}
 	}
@@ -257,6 +266,7 @@ func detectPythonFramework(dir string, deps map[string]bool, pm string) *Project
 			ScriptCmd:  "flask run --host=0.0.0.0 --port=5000",
 			PkgManager: pm,
 			RunCmd:     "flask run --host=0.0.0.0 --port=5000",
+			InstallCmd: installCmd,
 			Image:      pythonImage,
 		}
 	}
@@ -269,11 +279,26 @@ func detectPythonFramework(dir string, deps map[string]bool, pm string) *Project
 			ScriptCmd:  "uvicorn main:app --host 0.0.0.0 --port 8000 --reload",
 			PkgManager: pm,
 			RunCmd:     "uvicorn main:app --host 0.0.0.0 --port 8000 --reload",
+			InstallCmd: installCmd,
 			Image:      pythonImage,
 		}
 	}
 
 	return nil
+}
+
+// pythonInstallCmd returns the install command for the given Python package manager.
+func pythonInstallCmd(pm string) string {
+	switch pm {
+	case "uv":
+		return "uv sync"
+	case "poetry":
+		return "poetry install"
+	case "pipenv":
+		return "pipenv install"
+	default:
+		return "pip install -r requirements.txt"
+	}
 }
 
 // detectPythonPkgManager checks for lockfiles to determine the Python package manager.

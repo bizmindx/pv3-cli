@@ -39,6 +39,41 @@ type RunConfig struct {
 	Verbose bool
 }
 
+// RunInstall installs project dependencies inside a Docker container.
+func RunInstall(cfg RunConfig) error {
+	if err := resolveRuntime(); err != nil {
+		return err
+	}
+
+	cleanupOrphans()
+
+	cwd, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("getting working directory: %w", err)
+	}
+
+	proj, err := project.ReadProject(cwd)
+	if err != nil {
+		return err
+	}
+
+	if proj.InstallCmd == "" {
+		return fmt.Errorf("no install command detected for %s project", proj.Runtime)
+	}
+
+	containerName := buildContainerName(cwd)
+	args := buildInstallArgs(cfg, cwd, containerName, proj)
+
+	if cfg.Verbose {
+		fmt.Fprintf(os.Stderr, "\n%s%s\n\n", dim, formatDockerCmd(dockerBin, args))
+		fmt.Fprint(os.Stderr, reset)
+	}
+
+	fmt.Fprintf(os.Stderr, "\n%spv3%s %s%s install%s\n\n", bold, reset, dim, proj.PkgManager, reset)
+
+	return executeInstall(containerName, args)
+}
+
 // Run executes the dev server inside a Docker container.
 func Run(cfg RunConfig) error {
 	if err := resolveRuntime(); err != nil {
@@ -141,6 +176,35 @@ func randomID(n int) string {
 	return string(b)
 }
 
+func buildInstallArgs(cfg RunConfig, cwd, containerName string, proj *project.ProjectInfo) []string {
+	args := []string{
+		"run",
+		"--rm",
+		"-it",
+		"--name", containerName,
+		"--user", fmt.Sprintf("%d:%d", os.Getuid(), os.Getgid()),
+		"-v", fmt.Sprintf("%s:/workspace:delegated", cwd),
+		"-w", "/workspace",
+		"--cap-drop=ALL",
+		"--security-opt", "no-new-privileges:true",
+		"--cpus=4",
+		"--memory=6g",
+	}
+
+	if cfg.NoNet {
+		args = append(args, "--network=none")
+	}
+
+	image := cfg.Image
+	if image == "" {
+		image = proj.Image
+	}
+	args = append(args, image)
+	args = append(args, "sh", "-c", proj.InstallCmd)
+
+	return args
+}
+
 func buildDockerArgs(cfg RunConfig, cwd, containerName string, proj *project.ProjectInfo) []string {
 	args := []string{
 		"run",
@@ -179,6 +243,48 @@ func buildDockerArgs(cfg RunConfig, cwd, containerName string, proj *project.Pro
 	args = append(args, "sh", "-c", proj.RunCmd)
 
 	return args
+}
+
+// executeInstall runs the install container and waits for it to finish.
+func executeInstall(containerName string, args []string) error {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, dockerBin, args...)
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	startTime := time.Now()
+	if err := cmd.Start(); err != nil {
+		return fmt.Errorf("starting container: %w", err)
+	}
+
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP)
+
+	doneCh := make(chan error, 1)
+	go func() {
+		doneCh <- cmd.Wait()
+	}()
+
+	select {
+	case <-sigCh:
+		signal.Stop(sigCh)
+		fmt.Fprintf(os.Stderr, "\n%sStopping...%s\n", dim, reset)
+		stopContainer(containerName)
+		<-doneCh
+		return fmt.Errorf("install cancelled")
+
+	case err := <-doneCh:
+		elapsed := time.Since(startTime)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "\n%sInstall failed.%s %s(%s)%s\n", bold, reset, dim, formatDuration(elapsed), reset)
+			return err
+		}
+		fmt.Fprintf(os.Stderr, "\n%s%sDone.%s %s(%s)%s\n", green, bold, reset, dim, formatDuration(elapsed), reset)
+		return nil
+	}
 }
 
 // execute runs the Docker container with full TTY passthrough and signal forwarding.

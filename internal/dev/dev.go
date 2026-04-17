@@ -39,6 +39,35 @@ The only difference: rogue dependencies can't touch your host system.`,
 	return cmd
 }
 
+func NewInstallCmd() *cobra.Command {
+	var cfg docker.RunConfig
+
+	cmd := &cobra.Command{
+		Use:   "install",
+		Short: "Install dependencies inside an isolated Docker container",
+		Long: `Detects your project type, spins up a sandboxed Docker container,
+and runs the appropriate install command (npm install, pip install, cargo fetch, etc.).
+
+Postinstall scripts and build hooks execute inside the container —
+they cannot access your host system beyond the project directory.`,
+		Example: `  pv3 install                     # auto-detect and install deps
+  pv3 install --no-net            # install with no network (from cache)
+  pv3 install --image node:20-slim  # override the default image
+  pv3 install --verbose           # show the docker run command`,
+		SilenceUsage:  true,
+		SilenceErrors: true,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return docker.RunInstall(cfg)
+		},
+	}
+
+	cmd.Flags().BoolVar(&cfg.NoNet, "no-net", false, "Disable all network access")
+	cmd.Flags().StringVar(&cfg.Image, "image", "", "Container image (auto-detected from project type)")
+	cmd.Flags().BoolVar(&cfg.Verbose, "verbose", false, "Print the docker run command")
+
+	return cmd
+}
+
 func NewRootCmd(version string) *cobra.Command {
 	root := &cobra.Command{
 		Use:     "pv3",
@@ -51,6 +80,7 @@ Use "pv3 run" for maximum isolation in a cloud microVM.`,
 	}
 
 	root.AddCommand(NewDevCmd())
+	root.AddCommand(NewInstallCmd())
 
 	return root
 }

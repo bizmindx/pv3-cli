@@ -48,6 +48,7 @@ func readRustProject(dir string) (*ProjectInfo, error) {
 		ScriptCmd:  "cargo run",
 		PkgManager: "cargo",
 		RunCmd:     "cargo run",
+		InstallCmd: "cargo fetch",
 		Image:      rustImage,
 	}, nil
 }
@@ -124,6 +125,7 @@ func detectRustFramework(dir string, deps map[string]bool) *ProjectInfo {
 			ScriptCmd:  "anchor build",
 			PkgManager: "cargo",
 			RunCmd:     "cargo run",
+			InstallCmd: "cargo fetch",
 			Image:      rustImage,
 		}
 	}
@@ -136,6 +138,7 @@ func detectRustFramework(dir string, deps map[string]bool) *ProjectInfo {
 			ScriptCmd:  "cargo build-sbf",
 			PkgManager: "cargo",
 			RunCmd:     "cargo run",
+			InstallCmd: "cargo fetch",
 			Image:      rustImage,
 		}
 	}

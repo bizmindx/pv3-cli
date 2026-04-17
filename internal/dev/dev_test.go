@@ -117,3 +117,83 @@ func TestNewRootCmd_DevSubcommand(t *testing.T) {
 		t.Errorf("subcommands = %v, missing 'dev'", names)
 	}
 }
+
+func TestNewInstallCmd_Defaults(t *testing.T) {
+	cmd := NewInstallCmd()
+
+	noNet, err := cmd.Flags().GetBool("no-net")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if noNet {
+		t.Error("no-net should default to false")
+	}
+
+	image, err := cmd.Flags().GetString("image")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if image != "" {
+		t.Errorf("image should default to empty, got %q", image)
+	}
+
+	verbose, err := cmd.Flags().GetBool("verbose")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if verbose {
+		t.Error("verbose should default to false")
+	}
+}
+
+func TestNewInstallCmd_FlagParsing(t *testing.T) {
+	cmd := NewInstallCmd()
+	cmd.SetArgs([]string{"--no-net", "--image", "node:20-slim", "--verbose"})
+	cmd.RunE = func(cmd *cobra.Command, args []string) error { return nil }
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatal(err)
+	}
+
+	noNet, _ := cmd.Flags().GetBool("no-net")
+	if !noNet {
+		t.Error("no-net should be true after --no-net")
+	}
+
+	image, _ := cmd.Flags().GetString("image")
+	if image != "node:20-slim" {
+		t.Errorf("image = %q, want 'node:20-slim'", image)
+	}
+
+	verbose, _ := cmd.Flags().GetBool("verbose")
+	if !verbose {
+		t.Error("verbose should be true after --verbose")
+	}
+}
+
+func TestNewInstallCmd_NoPortFlag(t *testing.T) {
+	cmd := NewInstallCmd()
+	_, err := cmd.Flags().GetInt("port")
+	if err == nil {
+		t.Error("install command should not have a --port flag")
+	}
+}
+
+func TestNewRootCmd_InstallSubcommand(t *testing.T) {
+	root := NewRootCmd("test")
+
+	var names []string
+	for _, cmd := range root.Commands() {
+		names = append(names, cmd.Name())
+	}
+
+	found := false
+	for _, n := range names {
+		if n == "install" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("subcommands = %v, missing 'install'", names)
+	}
+}

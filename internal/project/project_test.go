@@ -139,59 +139,65 @@ func TestReadProject(t *testing.T) {
 	td := testdataDir(t)
 
 	tests := []struct {
-		name        string
-		fixture     string // path relative to testdata/
-		wantRuntime string
-		wantScript  string
-		wantPM      string
-		wantRunCmd  string
-		wantImage   string
-		wantErr     bool
+		name           string
+		fixture        string // path relative to testdata/
+		wantRuntime    string
+		wantScript     string
+		wantPM         string
+		wantRunCmd     string
+		wantInstallCmd string
+		wantImage      string
+		wantErr        bool
 	}{
 		{
-			name:        "vite-react with npm",
-			fixture:     "javascript/vite-react",
-			wantRuntime: "node",
-			wantScript:  "dev",
-			wantPM:      "npm",
-			wantRunCmd:  "npm run dev",
-			wantImage:   "node:22-bookworm-slim",
+			name:           "vite-react with npm",
+			fixture:        "javascript/vite-react",
+			wantRuntime:    "node",
+			wantScript:     "dev",
+			wantPM:         "npm",
+			wantRunCmd:     "npm run dev",
+			wantInstallCmd: "npm install",
+			wantImage:      "node:22-bookworm-slim",
 		},
 		{
-			name:        "next.js with yarn",
-			fixture:     "javascript/nextjs-yarn",
-			wantRuntime: "node",
-			wantScript:  "dev",
-			wantPM:      "yarn",
-			wantRunCmd:  "yarn run dev",
-			wantImage:   "node:22-bookworm-slim",
+			name:           "next.js with yarn",
+			fixture:        "javascript/nextjs-yarn",
+			wantRuntime:    "node",
+			wantScript:     "dev",
+			wantPM:         "yarn",
+			wantRunCmd:     "yarn run dev",
+			wantInstallCmd: "yarn install",
+			wantImage:      "node:22-bookworm-slim",
 		},
 		{
-			name:        "nuxt with pnpm",
-			fixture:     "javascript/nuxt-pnpm",
-			wantRuntime: "node",
-			wantScript:  "dev",
-			wantPM:      "pnpm",
-			wantRunCmd:  "pnpm run dev",
-			wantImage:   "node:22-bookworm-slim",
+			name:           "nuxt with pnpm",
+			fixture:        "javascript/nuxt-pnpm",
+			wantRuntime:    "node",
+			wantScript:     "dev",
+			wantPM:         "pnpm",
+			wantRunCmd:     "pnpm run dev",
+			wantInstallCmd: "pnpm install",
+			wantImage:      "node:22-bookworm-slim",
 		},
 		{
-			name:        "express with start only",
-			fixture:     "javascript/express-start",
-			wantRuntime: "node",
-			wantScript:  "start",
-			wantPM:      "npm",
-			wantRunCmd:  "npm run start",
-			wantImage:   "node:22-bookworm-slim",
+			name:           "express with start only",
+			fixture:        "javascript/express-start",
+			wantRuntime:    "node",
+			wantScript:     "start",
+			wantPM:         "npm",
+			wantRunCmd:     "npm run start",
+			wantInstallCmd: "npm install",
+			wantImage:      "node:22-bookworm-slim",
 		},
 		{
-			name:        "vue-cli with serve only",
-			fixture:     "javascript/vue-serve",
-			wantRuntime: "node",
-			wantScript:  "serve",
-			wantPM:      "npm",
-			wantRunCmd:  "npm run serve",
-			wantImage:   "node:22-bookworm-slim",
+			name:           "vue-cli with serve only",
+			fixture:        "javascript/vue-serve",
+			wantRuntime:    "node",
+			wantScript:     "serve",
+			wantPM:         "npm",
+			wantRunCmd:     "npm run serve",
+			wantInstallCmd: "npm install",
+			wantImage:      "node:22-bookworm-slim",
 		},
 		{
 			name:    "no dev script",
@@ -204,49 +210,54 @@ func TestReadProject(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name:        "project with .env file",
-			fixture:     "javascript/env-file",
-			wantRuntime: "node",
-			wantScript:  "dev",
-			wantPM:      "npm",
-			wantRunCmd:  "npm run dev",
-			wantImage:   "node:22-bookworm-slim",
+			name:           "project with .env file",
+			fixture:        "javascript/env-file",
+			wantRuntime:    "node",
+			wantScript:     "dev",
+			wantPM:         "npm",
+			wantRunCmd:     "npm run dev",
+			wantInstallCmd: "npm install",
+			wantImage:      "node:22-bookworm-slim",
 		},
 		{
-			name:        "django via ReadProject dispatcher",
-			fixture:     "python/python-django",
-			wantRuntime: "python",
-			wantScript:  "runserver",
-			wantPM:      "pip",
-			wantRunCmd:  "python manage.py runserver 0.0.0.0:8000",
-			wantImage:   "python:3.12-slim",
+			name:           "django via ReadProject dispatcher",
+			fixture:        "python/python-django",
+			wantRuntime:    "python",
+			wantScript:     "runserver",
+			wantPM:         "pip",
+			wantRunCmd:     "python manage.py runserver 0.0.0.0:8000",
+			wantInstallCmd: "pip install -r requirements.txt",
+			wantImage:      "python:3.12-slim",
 		},
 		{
-			name:        "flask via ReadProject dispatcher",
-			fixture:     "python/python-flask",
-			wantRuntime: "python",
-			wantScript:  "flask run",
-			wantPM:      "pip",
-			wantRunCmd:  "flask run --host=0.0.0.0 --port=5000",
-			wantImage:   "python:3.12-slim",
+			name:           "flask via ReadProject dispatcher",
+			fixture:        "python/python-flask",
+			wantRuntime:    "python",
+			wantScript:     "flask run",
+			wantPM:         "pip",
+			wantRunCmd:     "flask run --host=0.0.0.0 --port=5000",
+			wantInstallCmd: "pip install -r requirements.txt",
+			wantImage:      "python:3.12-slim",
 		},
 		{
-			name:        "solana anchor via ReadProject dispatcher",
-			fixture:     "rust/solana-anchor",
-			wantRuntime: "rust",
-			wantScript:  "anchor build",
-			wantPM:      "cargo",
-			wantRunCmd:  "cargo run",
-			wantImage:   "rust:1.85-slim",
+			name:           "solana anchor via ReadProject dispatcher",
+			fixture:        "rust/solana-anchor",
+			wantRuntime:    "rust",
+			wantScript:     "anchor build",
+			wantPM:         "cargo",
+			wantRunCmd:     "cargo run",
+			wantInstallCmd: "cargo fetch",
+			wantImage:      "rust:1.85-slim",
 		},
 		{
-			name:        "generic rust via ReadProject dispatcher",
-			fixture:     "rust/rust-generic",
-			wantRuntime: "rust",
-			wantScript:  "run",
-			wantPM:      "cargo",
-			wantRunCmd:  "cargo run",
-			wantImage:   "rust:1.85-slim",
+			name:           "generic rust via ReadProject dispatcher",
+			fixture:        "rust/rust-generic",
+			wantRuntime:    "rust",
+			wantScript:     "run",
+			wantPM:         "cargo",
+			wantRunCmd:     "cargo run",
+			wantInstallCmd: "cargo fetch",
+			wantImage:      "rust:1.85-slim",
 		},
 	}
 
@@ -275,6 +286,9 @@ func TestReadProject(t *testing.T) {
 			}
 			if info.RunCmd != tt.wantRunCmd {
 				t.Errorf("RunCmd = %q, want %q", info.RunCmd, tt.wantRunCmd)
+			}
+			if info.InstallCmd != tt.wantInstallCmd {
+				t.Errorf("InstallCmd = %q, want %q", info.InstallCmd, tt.wantInstallCmd)
 			}
 			if info.Image != tt.wantImage {
 				t.Errorf("Image = %q, want %q", info.Image, tt.wantImage)

@@ -16,6 +16,7 @@ func TestReadPythonProject_Django(t *testing.T) {
 	assertField(t, "Runtime", info.Runtime, "python")
 	assertField(t, "ScriptName", info.ScriptName, "runserver")
 	assertField(t, "RunCmd", info.RunCmd, "python manage.py runserver 0.0.0.0:8000")
+	assertField(t, "InstallCmd", info.InstallCmd, "pip install -r requirements.txt")
 	assertField(t, "PkgManager", info.PkgManager, "pip")
 	assertField(t, "Image", info.Image, pythonImage)
 }
@@ -30,6 +31,7 @@ func TestReadPythonProject_Flask(t *testing.T) {
 	assertField(t, "Runtime", info.Runtime, "python")
 	assertField(t, "ScriptName", info.ScriptName, "flask run")
 	assertField(t, "RunCmd", info.RunCmd, "flask run --host=0.0.0.0 --port=5000")
+	assertField(t, "InstallCmd", info.InstallCmd, "pip install -r requirements.txt")
 	assertField(t, "PkgManager", info.PkgManager, "pip")
 }
 
@@ -43,6 +45,7 @@ func TestReadPythonProject_FastAPI(t *testing.T) {
 	assertField(t, "Runtime", info.Runtime, "python")
 	assertField(t, "ScriptName", info.ScriptName, "uvicorn")
 	assertField(t, "RunCmd", info.RunCmd, "uvicorn main:app --host 0.0.0.0 --port 8000 --reload")
+	assertField(t, "InstallCmd", info.InstallCmd, "pip install -r requirements.txt")
 	assertField(t, "PkgManager", info.PkgManager, "pip")
 }
 
@@ -56,6 +59,7 @@ func TestReadPythonProject_PyprojectScripts(t *testing.T) {
 	assertField(t, "Runtime", info.Runtime, "python")
 	assertField(t, "ScriptName", info.ScriptName, "dev")
 	assertField(t, "ScriptCmd", info.ScriptCmd, "app:main")
+	assertField(t, "InstallCmd", info.InstallCmd, "pip install -r requirements.txt")
 	assertField(t, "PkgManager", info.PkgManager, "pip")
 }
 
@@ -69,6 +73,7 @@ func TestReadPythonProject_Poetry(t *testing.T) {
 	assertField(t, "Runtime", info.Runtime, "python")
 	assertField(t, "ScriptName", info.ScriptName, "serve")
 	assertField(t, "ScriptCmd", info.ScriptCmd, "app:main")
+	assertField(t, "InstallCmd", info.InstallCmd, "poetry install")
 	assertField(t, "PkgManager", info.PkgManager, "poetry")
 }
 
@@ -81,7 +86,29 @@ func TestReadPythonProject_Uv(t *testing.T) {
 
 	assertField(t, "Runtime", info.Runtime, "python")
 	assertField(t, "ScriptName", info.ScriptName, "runserver")
+	assertField(t, "InstallCmd", info.InstallCmd, "uv sync")
 	assertField(t, "PkgManager", info.PkgManager, "uv")
+}
+
+func TestPythonInstallCmd(t *testing.T) {
+	tests := []struct {
+		pm   string
+		want string
+	}{
+		{"uv", "uv sync"},
+		{"poetry", "poetry install"},
+		{"pipenv", "pipenv install"},
+		{"pip", "pip install -r requirements.txt"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.pm, func(t *testing.T) {
+			got := pythonInstallCmd(tt.pm)
+			if got != tt.want {
+				t.Errorf("pythonInstallCmd(%q) = %q, want %q", tt.pm, got, tt.want)
+			}
+		})
+	}
 }
 
 func TestReadPythonProject_NoDev(t *testing.T) {

@@ -1,6 +1,6 @@
 # pv3
 
-**Run your dev server in an isolated Docker container.** Same logs, same localhost URLs — rogue dependencies can't touch your host system.
+**Run your dev server in an isolated Docker container or microvms powered by microsandbox.** Same logs, same localhost URLs — rogue dependencies can't touch your host system. no wallet drains
 
 No Dockerfiles. No config. Just `pv3 dev`.
 
